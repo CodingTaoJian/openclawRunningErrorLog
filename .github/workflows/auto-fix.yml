@@ -1,0 +1,29 @@
+name: Auto Fix on Failure
+
+on:
+  workflow_run:
+    workflows: ['CI', 'Test', 'Build', 'Lint']
+    types: [completed]
+    branches: [main, master]
+
+jobs:
+  trigger-openclaw:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - name: Trigger OpenClaw to fix
+        env:
+          NGROK_URL: "https://nonfortifying-nonliberal-gunnar.ngrok-free.dev"
+          HOOK_TOKEN: "openclaw-hook-secret-2026"
+        run: |
+          curl -s -X POST "${{ env.NGROK_URL }}/hooks/agent" \
+            -H "Authorization: Bearer ${{ env.HOOK_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -H "x-github-event: workflow_run" \
+            -d "{
+              \"message\": \"🚨 GitHub Workflow 失败通知\\n\\n仓库: ${{ github.repository }}\\n工作流: ${{ github.event.workflow_run.name }}\\n分支: ${{ github.event.workflow_run.head_branch }}\\n运行号: #${{ github.event.workflow_run.run_number }}\\n结论: ${{ github.event.workflow_run.conclusion }}\\n链接: ${{ github.event.workflow_run.html_url }}\\n\\n请执行:\\n1. 使用 gh run view --log 获取失败日志\\n2. 分析错误原因\\n3. 生成修复代码\\n4. 创建分支并提交 PR\\n5. 报告 PR 链接\",\
+              \"name\": \"GitHub-AutoFix\",\
+              \"agentId\": \"main\",\
+              \"deliver\": true,\
+              \"timeoutSeconds\": 300\
+            }"
